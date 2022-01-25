@@ -46,18 +46,10 @@ const create = (req, res) => {
 //     );
 // };
 
-const update = async  (req, res) => {
+const update =async  (req, res) => {
   if (!req.params?.id) return res.status(404).send(`No Product with this id: ${id}`);
-  var image = null
-  if(req.file!=undefined && req.file.path != undefined){
-    image = req.file.path
-  }else{
-    image = null
-  }
-  modify(req.params.id,req.body,image).then(response=>{
+  modify(req.params.id,req.body,req.file.path).then(response=>{
     res.json(response);
-  }).catch(error =>{
-    console.log(error)
   });
 }
 

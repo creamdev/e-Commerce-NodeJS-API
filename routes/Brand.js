@@ -1,7 +1,7 @@
 const express = require("express")
 const router = express.Router();
 const {create,index,idList,update,_delete} = require("../controllers/Brand");
-const upload= require('../middlewares/imageUploads')
+const upload = require('../middlewares/imageUploads')
 const schemas = require("../validations/Brand");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");

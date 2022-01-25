@@ -7,8 +7,8 @@ const sendEmail = async (email, subject, text) => {
       port: 587,
       secure: true,
       auth: {
-        user: process.env.SEND_MAIL,
-        pass: process.env.SEND_MAIL_PASSWORD
+        user: "",
+        pass: "",
       },
     });
 

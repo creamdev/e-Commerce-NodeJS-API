@@ -1,5 +1,4 @@
 const Mongoose = require('mongoose');
-const logger = require('../scripts/logger/Product')
 
 
 const ProductSchema =new Mongoose.Schema({
@@ -17,12 +16,5 @@ const ProductSchema =new Mongoose.Schema({
         ref:'Brand'
     }
 })
-
-ProductSchema.post("save",(doc)=>{
-    logger.log({
-        level:"info",
-        message:doc
-    });
-});
 
 module.exports=Mongoose.model('Product',ProductSchema)
