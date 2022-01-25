@@ -36,9 +36,16 @@ const getProductByCategoryId=(id)=>{
 }
 
 const modify = async (paramsid,data,imagepath) => {
+  var image = null
   const id = paramsid;
   const {name,description,price,stock,category,brand} = data
-  const image = imagepath
+  if(!imagepath ){
+    const product =  Product.findOne({ _id: paramsid });
+    image = product.image
+  }
+  else{
+    image=imagepath
+  }
   const updateProduct = {name,description,price,stock,category,brand,image,_id:id}
   return await Product.findByIdAndUpdate(id, updateProduct, { new: true });
 };
