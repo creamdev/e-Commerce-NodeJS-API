@@ -1,8 +1,20 @@
-const {insert,list,loginUser,modify,remove,} = require("../services/User");
+const {insert,list,loginUser,modify,remove,newPassword} = require("../services/User");
 const httpStatus = require("http-status");
 const uuid = require("uuid");
 const eventEmitter = require("../scripts/events/eventEmitter");
 const path = require("path");
+const redis = require("redis")
+
+const client = redis.createClient(6379);
+
+//check connect
+client.on('connect', function () {
+  console.log("Users Redis is ready");
+});
+// if error
+client.on('error', (err) => {
+  console.log(err);
+});
 
 const {
   passwordToHash,
@@ -11,15 +23,20 @@ const {
 } = require("../scripts/utils/helper");
 
 const create = (req, res) => {
-  req.body.password = passwordToHash(req.body.password);
-  insert(req.body)
-    .then((response) => {
+  try{
+    req.body.password = passwordToHash(req.body.password);
+    insert(req.body).then((response)=>{
+      if(client.connected){
+        client.del('users',function(err,res){})
+      }
       res.status(httpStatus.CREATED).send(response);
     })
-    .catch((e) => {
-      console.log(e)
-      res.status(httpStatus.INTERNAL_SERVER_ERROR).send(e);
-    });
+  }catch{
+    console.log(err)
+    res.status(500).send({message: err.message});
+  }
+
+
 };
 
 const login = (req, res) => {
@@ -45,24 +62,46 @@ const login = (req, res) => {
 };
 
 const index = (req, res) => {
-  list()
-    .then((response) => {
-      res.status(httpStatus.OK).send(response);
-    })
-    .catch((e) => res.status(httpStatus.INTERNAL_SERVER_ERROR).send(e));
+  try {
+    if(client.connected){
+      client.get('users', async (err, usersdata) => {
+        if (err) console.log(err)
+        
+        if (usersdata) {
+          const usersfromcache = JSON.parse(usersdata);
+          console.log('Users retrieved from the redis cache');
+          return res.status(200).json(usersfromcache);
+        }
+        else{
+          list().then((response)=>{
+                const users = response;
+                console.log(users)
+                client.setex('users', 1400, JSON.stringify(users));
+                console.log('Rediste yoktu apiden alındı sonra Redise kaydedildi.');
+                return res.status(200).send(users);
+              });
+        }  
+    });
+    }else{
+      list().then((response)=>{
+            const users = response;
+            console.log('Users retrieved from the API');
+            return res.status(200).send(users);
+          });
+    }
+} catch(err) {
+    console.log(err)
+    res.status(500).send({message: err.message});
+}
 };
-
-
 
 const resetPassword = (req, res) => {
   const new_password =
     uuid.v4()?.split("-")[0] || `usr-${new Date().getTime()}`;
-  modify({ email: req.body.email }, { password: passwordToHash(new_password) })
+  modify({ email: req.body.email })
     .then((updateUser) => {
       if (!updateUser)
-        return res
-          .status(httpStatus.NOT_FOUND)
-          .send({ error: "There is no user." });
+        return res.status(httpStatus.NOT_FOUND).send({ error: "There is no user." });
       eventEmitter.emit("send_email", {
         to: updateUser.email,
         subject: "Reset Password",
@@ -83,6 +122,9 @@ const resetPassword = (req, res) => {
 const update = (req, res) => {
   modify({ _id: req.user?._id }, req.body)
     .then((updateUser) => {
+      if(client.connected){
+        client.del('users',function(err,res){})
+      }
       res.status(httpStatus.OK).send(updateUser);
     })
     .catch(() =>
@@ -100,11 +142,13 @@ const deleteUser = (req, res) => {
   }
   remove(req.params.id)
     .then((deletedUser) => {
-      console.log(deletedUser);
-      if (!deleteUser) {
+      if (!deletedUser) {
         res.status(httpStatus.NOT_FOUND).send({
           message: "User not found",
         });
+      }
+      if(client.connected){
+        client.del('users',function(err,res){})
       }
       res.status(httpStatus.OK).send({
         message: "User deleted successfully",
@@ -124,9 +168,7 @@ const changePassword = (req, res) => {
       res.status(httpStatus.OK).send(updateUser);
     })
     .catch(() =>
-      res
-        .status(httpStatus.INTERNAL_SERVER_ERROR)
-        .send({ error: "A problem occurred during the update process" })
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ error: "A problem occurred during the update process" })
     );
 };
 
@@ -166,6 +208,34 @@ const updateProfileImage = (req, res) => {
   });
 };
 
+const _newPassword =async (req,res)=>{
+  if (!req.params?.id) {
+    return res.status(httpStatus.BAD_REQUEST).send({
+      message: "Id information is missing",
+    });
+  }
+  if (!req.params?.token) {
+    return res.status(httpStatus.BAD_REQUEST).send({
+      message: "Token information is missing",
+    });
+  }
+  req.body.password = passwordToHash(req.body.password);
+  newPassword(req.params?.id,req.params?.token,req.body.password).then((response)=>{
+    if(response.statusCode==400){
+      res.status(httpStatus.BAD_REQUEST).send(response.message);
+    }
+    else{
+      res.status(httpStatus.OK).send(response.message);
+    }
+  }).catch((e)=>{
+    console.log(e)
+    res.send("An error occured");
+  })
+}
+
+
+
+
 module.exports = {
   create,
   index,
@@ -174,5 +244,6 @@ module.exports = {
   update,
   deleteUser,
   changePassword,
-  updateProfileImage
+  updateProfileImage,
+  _newPassword
 };

@@ -37,4 +37,28 @@ const VerifyMail = async (req, res) => {
         }   
 }
 
-module.exports = {SendMail, VerifyMail}
+const resetPasswordMail = async (req,res)=> {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user)
+        return res.status(400).send("user with given email doesn't exist");
+
+    let token = await Token.findOne({ userId: user._id });
+    if (!token) {
+        token = await new Token({
+            userId: user._id,
+            token: crypto.randomBytes(32).toString("hex"),
+        }).save();
+    }
+    const message = `http://localhost:3000/users/new-password/${user._id}/${token.token}`;
+    await sendEmail(user.email, "Password reset", message);
+    res.send("password reset link sent to your email account");
+} catch (error) {
+    res.send("An error occured");
+    console.log(error);
+}
+}
+
+
+
+module.exports = {SendMail, VerifyMail,resetPasswordMail}

@@ -7,7 +7,6 @@ const loaders = require("./loaders");
 require('./loaders/dbConnect')
 var bodyParser = require('body-parser');
 
-
 const app = express();
 
 app.use((req, res, next) => {
@@ -24,14 +23,11 @@ config();
 loaders();
 events();
 
-
 //app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(helmet());
 app.use('/uploads',express.static('uploads'))
 app.use(bodyParser.urlencoded({extended:true}))
 app.use(bodyParser.json())
-
-
 
 app.listen(process.env.APP_PORT, () => {
   console.log(`3000 Port Connected`);
